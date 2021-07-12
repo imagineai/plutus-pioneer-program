@@ -10,8 +10,6 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module Week03.Homework1 where
-
 import           Control.Monad        hiding (fmap)
 import           Data.Aeson           (ToJSON, FromJSON)
 import           Data.Map             as Map
@@ -43,7 +41,24 @@ PlutusTx.unstableMakeIsData ''VestingDatum
 -- This should validate if either beneficiary1 has signed the transaction and the current slot is before or at the deadline
 -- or if beneficiary2 has signed the transaction and the deadline has passed.
 mkValidator :: VestingDatum -> () -> ScriptContext -> Bool
-mkValidator _ _ _ = False -- FIX ME!
+mkValidator dat _ ctx = 
+    if b1Signed
+    then traceIfFalse "first beneficiary got the gift too late" beforeDeadline
+    else if b2Signed
+         then traceIfFalse "second beneficiary got the gift too early" (not beforeDeadline)
+         else traceError "signature not recognized"
+    where
+        info :: TxInfo
+        info = scriptContextTxInfo ctx
+
+        b1Signed :: Bool
+        b1Signed = beneficiary1 dat `elem` txInfoSignatories info
+
+        b2Signed :: Bool
+        b2Signed = beneficiary2 dat `elem` txInfoSignatories info
+
+        beforeDeadline :: Bool
+        beforeDeadline = to (deadline dat) `contains` txInfoValidRange info
 
 data Vesting
 instance Scripts.ScriptType Vesting where
